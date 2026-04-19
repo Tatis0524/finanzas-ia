@@ -1,4 +1,5 @@
 import { PWAInstallPrompt } from "@/components/pwa-install-prompt";
+import RegisterSW from "@/components/register-sw";
 import type { Metadata, Viewport } from 'next'
 import { Geist, Geist_Mono } from 'next/font/google'
 import { Analytics } from '@vercel/analytics/next'
@@ -44,9 +45,9 @@ export const viewport: Viewport = {
 
 export default function RootLayout({
   children,
-}: Readonly<{
+}: {
   children: React.ReactNode
-}>) {
+}) {
   return (
     <html lang="es" className="bg-background">
       <head>
@@ -57,7 +58,11 @@ export default function RootLayout({
       <body className="font-sans antialiased">
         {children}
 
-        <PWAInstallPrompt />  {/* 👈 AGREGA ESTO */}
+        {/* 🔥 Registro del Service Worker */}
+        <RegisterSW />
+
+        {/* 🔥 Prompt de instalación */}
+        <PWAInstallPrompt />
 
         {process.env.NODE_ENV === 'production' && <Analytics />}
       </body>
