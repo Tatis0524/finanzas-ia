@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <rect width="512" height="512" rx="100" fill="#0a0a0a"/>
+  <g fill="white">
+    <!-- Wallet -->
+    <rect x="100" y="180" width="250" height="180" rx="20" fill="none" stroke="white" stroke-width="16"/>
+    <rect x="100" y="220" width="250" height="40" fill="white"/>
+    <circle cx="300" cy="290" r="20" fill="#0a0a0a"/>
+    <!-- Sparkles -->
+    <path d="M380 100 L390 130 L420 140 L390 150 L380 180 L370 150 L340 140 L370 130 Z" fill="#fbbf24"/>
+    <path d="M420 200 L426 218 L444 224 L426 230 L420 248 L414 230 L396 224 L414 218 Z" fill="#fbbf24"/>
+    <path d="M440 140 L444 152 L456 156 L444 160 L440 172 L436 160 L424 156 L436 152 Z" fill="#fbbf24"/>
+  </g>
+</svg>
