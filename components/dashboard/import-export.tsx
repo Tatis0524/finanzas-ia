@@ -88,6 +88,80 @@ export function ImportExport() {
     }
   }
 
+  // Parse Colombian amount format: "$ 1.500.000" or "1.500.000" -> 1500000
+  const parseColombianAmount = (value: string | number | undefined): number | null => {
+    if (value === undefined || value === null) return null
+    
+    let str = String(value)
+    // Remove currency symbol and whitespace
+    str = str.replace(/[$\s]/g, "")
+    
+    // Colombian format uses period as thousands separator
+    // Check if it looks like Colombian format (multiple periods or ends with .000)
+    const periodCount = (str.match(/\./g) || []).length
+    const hasColombianFormat = periodCount > 1 || /\.\d{3}$/.test(str)
+    
+    if (hasColombianFormat) {
+      // Remove all periods (thousands separators)
+      str = str.replace(/\./g, "")
+      // Replace comma with period if present (decimal)
+      str = str.replace(",", ".")
+    } else {
+      // Standard format: comma as thousands, period as decimal
+      str = str.replace(/,/g, "")
+    }
+    
+    const num = parseFloat(str)
+    return isNaN(num) ? null : num
+  }
+
+  // Parse date in multiple formats including DD/MM/YYYY
+  const parseDate = (dateValue: string | number | undefined): string => {
+    const today = new Date()
+    const fallback = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}-${String(today.getDate()).padStart(2, "0")}`
+    
+    if (!dateValue) return fallback
+    
+    let dateStr = String(dateValue).trim()
+    
+    // Handle Excel serial number dates
+    if (!isNaN(Number(dateStr)) && Number(dateStr) > 40000 && Number(dateStr) < 50000) {
+      const excelDate = XLSX.SSF.parse_date_code(Number(dateStr))
+      if (excelDate) {
+        return `${excelDate.y}-${String(excelDate.m).padStart(2, "0")}-${String(excelDate.d).padStart(2, "0")}`
+      }
+    }
+    
+    // Try DD/MM/YYYY format (Colombian/European)
+    const ddmmyyyy = dateStr.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})$/)
+    if (ddmmyyyy) {
+      const [, day, month, year] = ddmmyyyy
+      return `${year}-${month.padStart(2, "0")}-${day.padStart(2, "0")}`
+    }
+    
+    // Try YYYY-MM-DD format (ISO)
+    const iso = dateStr.match(/^(\d{4})[\/\-](\d{1,2})[\/\-](\d{1,2})$/)
+    if (iso) {
+      const [, year, month, day] = iso
+      return `${year}-${month.padStart(2, "0")}-${day.padStart(2, "0")}`
+    }
+    
+    // Try MM/DD/YYYY format (US)
+    const mmddyyyy = dateStr.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})$/)
+    if (mmddyyyy) {
+      // Already handled above as DD/MM/YYYY, this is ambiguous
+      // Assume DD/MM/YYYY for Colombian format
+    }
+    
+    // Last resort: try native Date parsing
+    const parsed = new Date(dateStr)
+    if (!isNaN(parsed.getTime())) {
+      return `${parsed.getFullYear()}-${String(parsed.getMonth() + 1).padStart(2, "0")}-${String(parsed.getDate()).padStart(2, "0")}`
+    }
+    
+    return fallback
+  }
+
   const handleFileImport = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0]
     if (!file) return
@@ -98,7 +172,7 @@ export function ImportExport() {
     try {
       const fileExtension = file.name.split(".").pop()?.toLowerCase()
       let importedData: Array<{
-        Fecha?: string
+        Fecha?: string | number
         Tipo?: string
         Monto?: number | string
         Categoria?: string
@@ -111,9 +185,9 @@ export function ImportExport() {
         importedData = result.data as typeof importedData
       } else if (fileExtension === "xlsx" || fileExtension === "xls") {
         const buffer = await file.arrayBuffer()
-        const wb = XLSX.read(buffer)
+        const wb = XLSX.read(buffer, { cellDates: false, raw: true })
         const ws = wb.Sheets[wb.SheetNames[0]]
-        importedData = XLSX.utils.sheet_to_json(ws)
+        importedData = XLSX.utils.sheet_to_json(ws, { raw: true })
       } else {
         throw new Error("Formato de archivo no soportado")
       }
@@ -124,30 +198,34 @@ export function ImportExport() {
       for (const row of importedData) {
         try {
           const type = row.Tipo?.toLowerCase().includes("ingreso") ? "income" : "expense"
-          const amount = typeof row.Monto === "string" ? parseFloat(row.Monto) : row.Monto
+          const amount = parseColombianAmount(row.Monto)
           
-          if (!amount || isNaN(amount) || amount <= 0) {
+          if (!amount || amount <= 0) {
             errorCount++
             continue
           }
 
-          // Try to match category
+          // Try to match category (normalize for accent-insensitive comparison)
           let categoryId = null
           if (row.Categoria) {
+            const normalizeStr = (s: string) => s.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "")
+            const rowCatNormalized = normalizeStr(row.Categoria)
             const matchedCategory = categories.find(
-              (c) => c.name.toLowerCase() === row.Categoria?.toLowerCase() && c.type === type
+              (c) => normalizeStr(c.name) === rowCatNormalized && c.type === type
             )
-            categoryId = matchedCategory?.id || null
-          }
-
-          // Parse date
-          let date = new Date().toISOString().split("T")[0]
-          if (row.Fecha) {
-            const parsedDate = new Date(row.Fecha)
-            if (!isNaN(parsedDate.getTime())) {
-              date = parsedDate.toISOString().split("T")[0]
+            // If no exact match, try partial match
+            if (!matchedCategory) {
+              const partialMatch = categories.find(
+                (c) => (normalizeStr(c.name).includes(rowCatNormalized) || rowCatNormalized.includes(normalizeStr(c.name))) && c.type === type
+              )
+              categoryId = partialMatch?.id || null
+            } else {
+              categoryId = matchedCategory.id
             }
           }
+
+          // Parse date properly
+          const date = parseDate(row.Fecha)
 
           await addTransaction({
             type,
@@ -287,8 +365,9 @@ export function ImportExport() {
             className="gap-2 text-muted-foreground"
             onClick={() => {
               const template = [
-                { Fecha: "2024-01-15", Tipo: "Gasto", Monto: 150.00, Categoria: "Alimentacion", Descripcion: "Supermercado" },
-                { Fecha: "2024-01-16", Tipo: "Ingreso", Monto: 5000.00, Categoria: "Salario", Descripcion: "Pago quincenal" },
+                { Fecha: "15/04/2026", Tipo: "Gasto", Monto: "150.000", Categoria: "Alimentacion", Descripcion: "Mercado quincenal" },
+                { Fecha: "15/04/2026", Tipo: "Ingreso", Monto: "3.000.000", Categoria: "Salario", Descripcion: "Pago primera quincena" },
+                { Fecha: "16/04/2026", Tipo: "Gasto", Monto: "85.000", Categoria: "Transporte", Descripcion: "Tanqueo vehiculo" },
               ]
               const csv = Papa.unparse(template)
               const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" })
