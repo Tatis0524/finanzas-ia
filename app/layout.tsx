@@ -1,3 +1,4 @@
+import { PWAInstallPrompt } from "@/components/pwa-install-prompt";
 import type { Metadata, Viewport } from 'next'
 import { Geist, Geist_Mono } from 'next/font/google'
 import { Analytics } from '@vercel/analytics/next'
@@ -55,6 +56,9 @@ export default function RootLayout({
       </head>
       <body className="font-sans antialiased">
         {children}
+
+        <PWAInstallPrompt />  {/* 👈 AGREGA ESTO */}
+
         {process.env.NODE_ENV === 'production' && <Analytics />}
       </body>
     </html>
