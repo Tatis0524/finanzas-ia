@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation"
 import { cn } from "@/lib/utils"
 import { useAuth } from "@/hooks/use-auth"
 import { Button } from "@/components/ui/button"
+import { usePWAInstall } from "@/components/use-pwa-install"
 import {
   Wallet,
   LayoutDashboard,
@@ -18,6 +19,7 @@ import {
   LogOut,
   Menu,
   X,
+  Download
 } from "lucide-react"
 import { useState } from "react"
 
@@ -36,6 +38,9 @@ export function Sidebar() {
   const pathname = usePathname()
   const { signOut } = useAuth()
   const [mobileOpen, setMobileOpen] = useState(false)
+
+  // 👇 HOOK DE INSTALACIÓN
+  const { install, canInstall } = usePWAInstall()
 
   return (
     <>
@@ -94,6 +99,17 @@ export function Sidebar() {
                 </Link>
               )
             })}
+
+            {/* 👇 BOTÓN INSTALAR APP */}
+            {canInstall && (
+              <button
+                onClick={install}
+                className="flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-muted-foreground hover:bg-accent hover:text-foreground w-full text-left"
+              >
+                <Download className="h-5 w-5" />
+                Instalar App
+              </button>
+            )}
           </nav>
 
           {/* Sign out */}
