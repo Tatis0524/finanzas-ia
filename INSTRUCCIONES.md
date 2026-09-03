@@ -46,7 +46,6 @@ FinanzasIA es una aplicacion web completa y funcional para la gestion de finanza
    - Genera imagen del "estilo de vida financiero" usando Pollinations.ai (API 100% gratuita)
    - Convierte la imagen en video motivacional de 5 segundos
    - Descarga de imagen y video
-
 ---
 
 ## Tecnologias Utilizadas

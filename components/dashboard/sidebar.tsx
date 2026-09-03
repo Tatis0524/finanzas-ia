@@ -27,10 +27,10 @@ const navItems = [
   { href: "/dashboard", label: "Inicio", icon: LayoutDashboard },
   { href: "/dashboard/transactions", label: "Transacciones", icon: ArrowUpDown },
   { href: "/dashboard/analytics", label: "Analisis", icon: BarChart3 },
-  { href: "/dashboard/ai-advisor", label: "Asesor IA", icon: Sparkles },
+  // { href: "/dashboard/ai-advisor", label: "Asesor IA", icon: Sparkles },
   { href: "/dashboard/voice", label: "Voz", icon: Mic },
-  { href: "/dashboard/import-export", label: "Importar/Exportar", icon: FileSpreadsheet },
-  { href: "/dashboard/lifestyle", label: "Estilo de Vida", icon: ImageIcon },
+  // { href: "/dashboard/import-export", label: "Importar/Exportar", icon: FileSpreadsheet },
+  // { href: "/dashboard/lifestyle", label: "Estilo de Vida", icon: ImageIcon },
   { href: "/dashboard/settings", label: "Configuracion", icon: Settings },
 ]
 
