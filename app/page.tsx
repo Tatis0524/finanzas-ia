@@ -60,18 +60,21 @@ export default function HomePage() {
     <div className="min-h-screen bg-gradient-to-b from-background via-background to-primary/5">
       {/* Header */}
       <header className="container mx-auto px-4 py-6">
-        <nav className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary">
+        <nav className="flex items-center justify-between gap-2">
+          <div className="flex items-center gap-2 min-w-0">
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-primary">
               <Wallet className="h-6 w-6 text-primary-foreground" />
             </div>
-            <span className="font-bold text-xl">FinanzasIA</span>
+            <span className="font-bold text-lg sm:text-xl truncate">FinanzasIA</span>
           </div>
-          <div className="flex items-center gap-3">
-            <Button variant="ghost" asChild>
+          <div className="flex items-center gap-1.5 sm:gap-3 shrink-0">
+            <Button variant="ghost" size="sm" asChild className="hidden sm:inline-flex">
               <Link href="/auth/login">Iniciar Sesion</Link>
             </Button>
-            <Button asChild>
+            <Button variant="ghost" size="sm" asChild className="sm:hidden px-2">
+              <Link href="/auth/login">Entrar</Link>
+            </Button>
+            <Button size="sm" asChild className="px-3 sm:px-4">
               <Link href="/auth/sign-up">Registrarse</Link>
             </Button>
           </div>
