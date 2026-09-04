@@ -26,6 +26,11 @@ const currencies = [
   { value: "PEN", label: "Sol Peruano (PEN)" },
 ]
 
+const suggestedEmojis = [
+  "✈️", "🏖️", "🎄", "🎉", "💍", "🎓", "🏠", "🚗",
+  "💰", "🎁", "❤️", "👶", "🏥", "📚", "💪", "🌟",
+]
+
 export default function SettingsPage() {
   const { profile, updateProfile, isLoading } = useProfile()
   const { user, signOut } = useAuth()
@@ -33,6 +38,7 @@ export default function SettingsPage() {
   const [fullName, setFullName] = useState(profile?.full_name || "")
   const [currency, setCurrency] = useState(profile?.currency || "MXN")
   const [monthlyBudget, setMonthlyBudget] = useState(profile?.monthly_budget?.toString() || "")
+  const [activeMonthLabel, setActiveMonthLabel] = useState(profile?.active_month_label || "")
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
 
@@ -43,6 +49,7 @@ export default function SettingsPage() {
         full_name: fullName,
         currency,
         monthly_budget: monthlyBudget ? parseFloat(monthlyBudget) : 0,
+        active_month_label: activeMonthLabel.trim() || null,
       })
       setSaved(true)
       setTimeout(() => setSaved(false), 2000)
@@ -147,6 +154,32 @@ export default function SettingsPage() {
                 />
                 <p className="text-sm text-muted-foreground mt-1">
                   Establece un limite de gastos mensuales para recibir alertas
+                </p>
+              </Field>
+              <Field>
+                <FieldLabel htmlFor="activeMonthLabel">Nombre del mes activo</FieldLabel>
+                <Input
+                  id="activeMonthLabel"
+                  value={activeMonthLabel}
+                  onChange={(e) => setActiveMonthLabel(e.target.value)}
+                  placeholder="Ej: ✈️ Mes del viaje"
+                  maxLength={40}
+                />
+                <div className="flex flex-wrap gap-1.5 mt-2">
+                  {suggestedEmojis.map((emoji) => (
+                    <button
+                      key={emoji}
+                      type="button"
+                      onClick={() => setActiveMonthLabel((prev) => `${emoji} ${prev.replace(/^\p{Emoji}\s*/u, "")}`.trim())}
+                      className="text-xl h-9 w-9 flex items-center justify-center rounded-md border border-border hover:bg-accent transition-colors"
+                      title={`Usar ${emoji}`}
+                    >
+                      {emoji}
+                    </button>
+                  ))}
+                </div>
+                <p className="text-sm text-muted-foreground mt-1">
+                  Elige un emoji y escribe un nombre para identificar este mes, por ejemplo &quot;Mes del viaje&quot;
                 </p>
               </Field>
             </FieldGroup>

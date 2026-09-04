@@ -5,6 +5,7 @@ import { useProfile } from "@/hooks/use-profile"
 import { StatsCards } from "@/components/dashboard/stats-cards"
 import { TransactionList } from "@/components/dashboard/transaction-list"
 import { IncomeVsExpensesChart, ExpensesByCategoryChart } from "@/components/dashboard/finance-charts"
+import { BalanceAlert } from "@/components/dashboard/balance-alert"
 import { Skeleton } from "@/components/ui/skeleton"
 
 export default function DashboardPage() {
@@ -33,13 +34,22 @@ export default function DashboardPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl md:text-3xl font-bold">
-          Hola, {firstName}!
-        </h1>
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+          <h1 className="text-2xl md:text-3xl font-bold">
+            Hola, {firstName}!
+          </h1>
+          {profile?.active_month_label && (
+            <span className="text-sm font-medium px-3 py-1 rounded-full bg-primary/10 text-primary">
+              {profile.active_month_label}
+            </span>
+          )}
+        </div>
         <p className="text-muted-foreground mt-1">
           Aqui tienes un resumen de tus finanzas
         </p>
       </div>
+
+      <BalanceAlert />
 
       <StatsCards />
 

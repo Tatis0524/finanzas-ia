@@ -3,6 +3,7 @@ export interface Profile {
   full_name: string | null
   currency: string
   monthly_budget: number
+  active_month_label: string | null
   created_at: string
   updated_at: string
 }
