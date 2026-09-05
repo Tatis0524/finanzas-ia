@@ -2,6 +2,14 @@
 
 import { useState } from "react"
 import { Button } from "@/components/ui/button"
+
+// Devuelve la fecha de HOY en hora local como "YYYY-MM-DD".
+// No usar new Date().toISOString() aqui: eso convierte a UTC y puede
+// adelantar la fecha un dia cuando la hora local esta detras de UTC (ej: Colombia UTC-5).
+function getLocalDateString(): string {
+  const now = new Date()
+  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`
+}
 import { Input } from "@/components/ui/input"
 import {
   Dialog,
@@ -36,12 +44,28 @@ export function TransactionForm({ transaction, onSuccess, trigger }: Transaction
   const [amount, setAmount] = useState(transaction?.amount?.toString() || "")
   const [description, setDescription] = useState(transaction?.description || "")
   const [categoryId, setCategoryId] = useState(transaction?.category_id || "")
-  const [date, setDate] = useState(transaction?.date || new Date().toISOString().split("T")[0])
+  const [date, setDate] = useState(transaction?.date || getLocalDateString())
 
-  const { addTransaction, updateTransaction } = useTransactions()
+  const { addTransaction, updateTransaction, transactions } = useTransactions()
   const { incomeCategories, expenseCategories } = useCategories()
 
   const categories = type === "income" ? incomeCategories : expenseCategories
+
+  // Saldo actual = ingresos - egresos
+  const currentBalance = (transactions ?? []).reduce(
+    (acc, t) => (t.type === "income" ? acc + t.amount : acc - t.amount),
+    0
+  )
+
+  // Si estamos editando un egreso existente, se le "devuelve" su monto original
+  // al saldo disponible, porque ese egreso ya estaba descontado.
+  const availableBalance =
+    transaction && transaction.type === "expense"
+      ? currentBalance + transaction.amount
+      : currentBalance
+
+  const parsedAmount = parseFloat(amount) || 0
+  const exceedsBalance = type === "expense" && parsedAmount > availableBalance
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -81,7 +105,7 @@ export function TransactionForm({ transaction, onSuccess, trigger }: Transaction
       setAmount("")
       setDescription("")
       setCategoryId("")
-      setDate(new Date().toISOString().split("T")[0])
+      setDate(getLocalDateString())
     }
   }
 
@@ -147,7 +171,14 @@ export function TransactionForm({ transaction, onSuccess, trigger }: Transaction
                 value={amount}
                 onChange={(e) => setAmount(e.target.value)}
                 required
+                aria-invalid={exceedsBalance}
               />
+              {exceedsBalance && (
+                <p className="text-sm text-destructive">
+                  No se puede registrar este egreso porque supera el saldo disponible.
+                  Monto máximo permitido: ${availableBalance.toFixed(2)}
+                </p>
+              )}
             </Field>
 
             <Field>
@@ -192,7 +223,7 @@ export function TransactionForm({ transaction, onSuccess, trigger }: Transaction
             <Button type="button" variant="outline" onClick={() => setOpen(false)}>
               Cancelar
             </Button>
-            <Button type="submit" disabled={loading}>
+            <Button type="submit" disabled={loading || exceedsBalance}>
               {loading ? (
                 <>
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />

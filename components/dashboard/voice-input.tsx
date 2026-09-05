@@ -3,8 +3,16 @@
 import { useState, useEffect, useCallback, useRef } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
 import { useTransactions, useCategories } from "@/hooks/use-transactions"
-import { Mic, MicOff, Loader2, CheckCircle, XCircle } from "lucide-react"
+import { Mic, MicOff, Loader2, CheckCircle, XCircle, Pencil, RotateCcw } from "lucide-react"
 
 interface SpeechRecognitionEvent extends Event {
   results: SpeechRecognitionResultList
@@ -35,14 +43,30 @@ declare global {
 export function VoiceInput() {
   const [isListening, setIsListening] = useState(false)
   const [transcript, setTranscript] = useState("")
-  const [status, setStatus] = useState<"idle" | "listening" | "processing" | "success" | "error">("idle")
+  const [status, setStatus] = useState <
+    "idle" | "listening" | "processing" | "confirming" | "success" | "error"
+  >("idle")
   const [message, setMessage] = useState("")
   const [isSupported, setIsSupported] = useState(true)
   const recognitionRef = useRef<SpeechRecognition | null>(null)
   const finalTranscriptRef = useRef("")
 
-  const { addTransaction } = useTransactions()
+  // Borrador editable que el usuario confirma antes de guardar
+  const [draft, setDraft] = useState<{
+    type: "income" | "expense"
+    amount: string
+    description: string
+    categoryId: string
+  } | null>(null)
+
+  const { addTransaction, transactions } = useTransactions()
   const { expenseCategories, incomeCategories } = useCategories()
+
+  // Saldo actual = ingresos - egresos (misma logica que en transaction-form.tsx)
+  const currentBalance = (transactions ?? []).reduce(
+    (acc, t) => (t.type === "income" ? acc + t.amount : acc - t.amount),
+    0
+  )
 
   useEffect(() => {
     if (typeof window !== "undefined") {
@@ -68,23 +92,50 @@ export function VoiceInput() {
     }
     
     // Check for "X mil" pattern (e.g., "cincuenta mil" = 50000)
-    const milMatch = normalizedText.match(/(\w+)\s*mil/)
-    if (milMatch) {
-      const wordNum = wordToNum[milMatch[1]]
-      if (wordNum) {
-        // Check for additional thousands
-        const afterMil = normalizedText.split("mil")[1] || ""
-        let additionalAmount = 0
-        
-        // Check for hundreds after mil
-        for (const [word, num] of Object.entries(wordToNum)) {
-          if (afterMil.includes(word)) {
-            additionalAmount += num
-          }
+    // Convierte un token (digito "30" o palabra "treinta") a numero
+    const tokenToNumber = (token: string): number | null => {
+      if (/^\d+$/.test(token)) return parseInt(token, 10)
+      return wordToNum[token] ?? null
+    }
+
+    // Check for "X millones [Y mil]" pattern (e.g., "3 millones", "tres millones quinientos mil")
+    const millonMatch = normalizedText.match(
+      /(\w+)\s*(?:millones|millón|millon)(?:\s+(?:de\s+)?(?:pesos\s+)?(\w+)\s*mil)?/
+    )
+    if (millonMatch) {
+      const millones = tokenToNumber(millonMatch[1])
+      if (millones !== null) {
+        let total = millones * 1_000_000
+        if (millonMatch[2]) {
+          const miles = tokenToNumber(millonMatch[2])
+          if (miles !== null) total += miles * 1000
         }
-        
-        return wordNum * 1000 + additionalAmount
+        return total
       }
+    }
+
+    // Check for "X mil [Y]" pattern (e.g., "cincuenta mil" = 50000, "30 mil" = 30000, "ocho mil" = 8000)
+    const milMatch = normalizedText.match(/(\w+)\s*mil(?:\s+(\w+))?/)
+    if (milMatch) {
+      const miles = tokenToNumber(milMatch[1])
+      if (miles !== null) {
+        let total = miles * 1000
+        if (milMatch[2]) {
+          const extra = tokenToNumber(milMatch[2])
+          if (extra !== null && extra < 1000) total += extra
+        }
+        return total
+      }
+    }
+
+    // Chrome a veces transcribe numeros grandes con ESPACIOS en vez de puntos
+    // (ej: "noventa mil" -> "90 000", "tres millones" -> "3 000 000")
+    // Tambien cubre el formato normal con puntos: "50.000", "1.500.000"
+    const groupedMatch = normalizedText.match(/\d{1,3}(?:[.\s]\d{3})+/)
+    if (groupedMatch) {
+      const numStr = groupedMatch[0].replace(/[.\s]/g, "")
+      const num = parseInt(numStr, 10)
+      if (!isNaN(num) && num > 0) return num
     }
     
     // Try to extract numeric values
@@ -174,66 +225,126 @@ export function VoiceInput() {
 
     // Extract description
     let description = text
-    // Remove common command words
+    // Remove common command words (incluye palabras numericas: "un millon", "treinta mil", etc.)
     const removeWords = [
       "gaste", "gasté", "gane", "gané", "recibi", "recibí", "pague", "pagué",
-      "ingreso", "ingrese", "peso", "pesos", "en", "de", "por", "para", "mil"
+      "cobre", "cobré", "ingreso", "ingrese", "peso", "pesos", "en", "de", "del",
+      "por", "para", "que", "mi", "con",
+      "mil", "millon", "millón", "millones",
+      "un", "una", "uno", "dos", "tres", "cuatro", "cinco", "seis", "siete",
+      "ocho", "nueve", "diez", "once", "doce", "trece", "catorce", "quince",
+      "veinte", "treinta", "cuarenta", "cincuenta", "sesenta", "setenta",
+      "ochenta", "noventa", "cien", "ciento", "doscientos", "trescientos",
+      "cuatrocientos", "quinientos", "seiscientos", "setecientos",
+      "ochocientos", "novecientos",
     ]
     for (const word of removeWords) {
-      const regex = new RegExp(`\\b${word}\\b`, "gi")
+      // \b falla con palabras que empiezan/terminan en vocal acentuada (gasté, recibí, pagué),
+      // porque \b se basa en \w y las tildes no cuentan como caracter de palabra.
+      // Usamos lookaround con \p{L} (unicode) en vez de \b para que sí las reconozca.
+      const regex = new RegExp(`(?<![\\p{L}\\p{N}])${word}(?![\\p{L}\\p{N}])`, "giu")
       description = description.replace(regex, "")
     }
-    // Remove numbers
-    description = description.replace(/[\d.,]+/g, "").trim()
+    // Remove currency symbols
+    description = description.replace(/[$]/g, "")
+    // Remove numbers (incluye numeros agrupados con espacio: "50 000")
+    description = description.replace(/\d{1,3}(?:[.,\s]\d{3})+|\d+/g, "")
     // Clean up extra spaces
     description = description.replace(/\s+/g, " ").trim()
 
     return { type, amount, category: matchedCategory, description: description || null }
   }, [expenseCategories, incomeCategories, parseColombianAmount])
 
-  const processTranscript = useCallback(async (transcriptText: string) => {
-    if (!transcriptText.trim()) return
-    
+  // Arma el borrador editable a partir del texto reconocido, pero NO guarda todavia
+  const prepareDraft = useCallback((transcriptText: string) => {
+    if (!transcriptText.trim()) {
+      setStatus("error")
+      setMessage("No se detectó ningún texto. Intenta de nuevo o escribe manualmente.")
+      return
+    }
+
+    const parsed = parseTranscript(transcriptText)
+
+    setDraft({
+      type: parsed.type,
+      amount: parsed.amount ? String(parsed.amount) : "",
+      description: parsed.description || "",
+      categoryId: parsed.category?.id || "",
+    })
+    setStatus("confirming")
+    setMessage(
+      parsed.amount
+        ? "Revisa los datos antes de guardar."
+        : "No se detectó un monto claro, verifícalo antes de guardar."
+    )
+  }, [parseTranscript])
+
+  // Se ejecuta solo cuando el usuario confirma el formulario
+  const confirmAndSave = useCallback(async () => {
+    if (!draft) return
+    const amountNum = parseFloat(draft.amount)
+
+    if (!amountNum || amountNum <= 0) {
+      setMessage("Ingresa un monto válido antes de guardar.")
+      return
+    }
+
+    if (draft.type === "expense" && amountNum > currentBalance) {
+      setMessage(
+        `No se puede registrar este egreso porque supera el saldo disponible. Monto máximo permitido: $${currentBalance.toLocaleString("es-CO")}`
+      )
+      return
+    }
+
     setStatus("processing")
     try {
-      const parsed = parseTranscript(transcriptText)
-      
-      if (!parsed.amount || parsed.amount <= 0) {
-        setStatus("error")
-        setMessage("No se detectó un monto válido. Intenta decir algo como 'Gasté 50.000 pesos en comida'")
-        return
-      }
-
-      // Use local date to avoid timezone issues
       const now = new Date()
       const localDate = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`
 
       await addTransaction({
-        type: parsed.type,
-        amount: parsed.amount,
-        description: parsed.description,
-        category_id: parsed.category?.id || null,
+        type: draft.type,
+        amount: amountNum,
+        description: draft.description || null,
+        category_id: draft.categoryId || null,
         date: localDate,
       })
 
-      // Format amount with Colombian thousands separator for display
-      const formattedAmount = parsed.amount.toLocaleString("es-CO")
-
+      const formattedAmount = amountNum.toLocaleString("es-CO")
       setStatus("success")
-      setMessage(`Se registró un ${parsed.type === "income" ? "ingreso" : "gasto"} de $${formattedAmount} COP${parsed.category ? ` en ${parsed.category.name}` : ""}`)
-      
+      setMessage(
+        `Se registró un ${draft.type === "income" ? "ingreso" : "gasto"} de $${formattedAmount} COP${
+          draft.description ? ` - ${draft.description}` : ""
+        }`
+      )
+
       setTimeout(() => {
         setStatus("idle")
         setTranscript("")
         setMessage("")
+        setDraft(null)
         finalTranscriptRef.current = ""
       }, 3000)
     } catch (error) {
       console.error("Error saving transaction:", error)
       setStatus("error")
-      setMessage("Error al guardar la transacción")
+      setMessage("Error al guardar la transacción. Puedes reintentar.")
     }
-  }, [parseTranscript, addTransaction])
+  }, [draft, addTransaction, currentBalance])
+
+  const cancelDraft = useCallback(() => {
+    setDraft(null)
+    setStatus("idle")
+    setTranscript("")
+    setMessage("")
+    finalTranscriptRef.current = ""
+  }, [])
+
+  const startManualEntry = useCallback(() => {
+    setDraft({ type: "expense", amount: "", description: "", categoryId: "" })
+    setTranscript("")
+    setStatus("confirming")
+    setMessage("Completa los datos manualmente.")
+  }, [])
 
   const startListening = useCallback(() => {
     if (!isSupported) return
@@ -277,7 +388,10 @@ export function VoiceInput() {
       setIsListening(false)
       const finalText = finalTranscriptRef.current
       if (finalText) {
-        processTranscript(finalText)
+        prepareDraft(finalText)
+      } else {
+        setStatus("error")
+        setMessage("No se detectó ningún texto. Intenta de nuevo o escribe manualmente.")
       }
     }
 
@@ -287,7 +401,7 @@ export function VoiceInput() {
     setTranscript("")
     setMessage("")
     finalTranscriptRef.current = ""
-  }, [isSupported, processTranscript])
+  }, [isSupported, prepareDraft])
 
   const stopListening = useCallback(() => {
     if (recognitionRef.current) {
@@ -330,6 +444,7 @@ export function VoiceInput() {
             variant={isListening ? "destructive" : "default"}
             className={`h-24 w-24 rounded-full ${isListening ? "animate-pulse" : ""}`}
             onClick={isListening ? stopListening : startListening}
+            disabled={status === "confirming" || status === "processing"}
           >
             {status === "processing" ? (
               <Loader2 className="h-10 w-10 animate-spin" />
@@ -349,7 +464,7 @@ export function VoiceInput() {
           </p>
         </div>
 
-        {transcript && (
+        {transcript && status !== "confirming" && (
           <div className="p-4 rounded-lg bg-muted">
             <p className="text-sm text-muted-foreground mb-1">Transcripción:</p>
             <p className="font-medium">&quot;{transcript}&quot;</p>
@@ -372,6 +487,32 @@ export function VoiceInput() {
           </div>
         )}
 
+        {status === "error" && (
+          <div className="flex gap-2">
+            <Button variant="outline" className="flex-1 gap-2" onClick={startListening}>
+              <RotateCcw className="h-4 w-4" />
+              Reintentar
+            </Button>
+            <Button variant="outline" className="flex-1 gap-2" onClick={startManualEntry}>
+              <Pencil className="h-4 w-4" />
+              Escribir manualmente
+            </Button>
+          </div>
+        )}
+
+        {status === "confirming" && draft && (
+          <FormularioConfirmacionVoz
+            draft={draft}
+            setDraft={setDraft}
+            transcript={transcript}
+            onConfirm={confirmAndSave}
+            onCancel={cancelDraft}
+            expenseCategories={expenseCategories}
+            incomeCategories={incomeCategories}
+            currentBalance={currentBalance}
+          />
+        )}
+
         <div className="text-sm text-muted-foreground space-y-2">
           <p className="font-medium">Ejemplos de comandos (Pesos Colombianos):</p>
           <ul className="list-disc list-inside space-y-1">
@@ -384,5 +525,123 @@ export function VoiceInput() {
         </div>
       </CardContent>
     </Card>
+  )
+}
+
+interface DraftTransaction {
+  type: "income" | "expense"
+  amount: string
+  description: string
+  categoryId: string
+}
+
+interface FormularioConfirmacionVozProps {
+  draft: DraftTransaction
+  setDraft: (draft: DraftTransaction) => void
+  transcript: string
+  onConfirm: () => void
+  onCancel: () => void
+  expenseCategories: { id: string; name: string }[]
+  incomeCategories: { id: string; name: string }[]
+  currentBalance: number
+}
+
+function FormularioConfirmacionVoz({
+  draft,
+  setDraft,
+  transcript,
+  onConfirm,
+  onCancel,
+  expenseCategories,
+  incomeCategories,
+  currentBalance,
+}: FormularioConfirmacionVozProps) {
+  const categories = draft.type === "income" ? incomeCategories : expenseCategories
+  const parsedAmount = parseFloat(draft.amount) || 0
+  const exceedsBalance = draft.type === "expense" && parsedAmount > currentBalance
+
+  return (
+    <div className="p-4 rounded-lg border border-border space-y-4">
+      {transcript && (
+        <p className="text-xs text-muted-foreground">
+          Escuchado: &quot;{transcript}&quot;
+        </p>
+      )}
+
+      <div className="flex gap-2">
+        <Button
+          type="button"
+          variant={draft.type === "expense" ? "default" : "outline"}
+          className="flex-1"
+          onClick={() => setDraft({ ...draft, type: "expense", categoryId: "" })}
+        >
+          Gasto
+        </Button>
+        <Button
+          type="button"
+          variant={draft.type === "income" ? "default" : "outline"}
+          className="flex-1"
+          onClick={() => setDraft({ ...draft, type: "income", categoryId: "" })}
+        >
+          Ingreso
+        </Button>
+      </div>
+
+      <div className="space-y-2">
+        <label className="text-sm font-medium">Monto</label>
+        <Input
+          type="number"
+          step="0.01"
+          min="0"
+          placeholder="0.00"
+          value={draft.amount}
+          onChange={(e) => setDraft({ ...draft, amount: e.target.value })}
+          aria-invalid={exceedsBalance}
+        />
+        {exceedsBalance && (
+          <p className="text-sm text-destructive">
+            No se puede registrar este egreso porque supera el saldo disponible.
+            Monto máximo permitido: ${currentBalance.toLocaleString("es-CO")}
+          </p>
+        )}
+      </div>
+
+      <div className="space-y-2">
+        <label className="text-sm font-medium">Descripción</label>
+        <Input
+          placeholder="Ej: transporte"
+          value={draft.description}
+          onChange={(e) => setDraft({ ...draft, description: e.target.value })}
+        />
+      </div>
+
+      <div className="space-y-2">
+        <label className="text-sm font-medium">Categoría</label>
+        <Select
+          value={draft.categoryId}
+          onValueChange={(value) => setDraft({ ...draft, categoryId: value })}
+        >
+          <SelectTrigger>
+            <SelectValue placeholder="Selecciona una categoria" />
+          </SelectTrigger>
+          <SelectContent>
+            {categories.map((cat) => (
+              <SelectItem key={cat.id} value={cat.id}>
+                {cat.name}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
+
+      <div className="flex gap-2 justify-end">
+        <Button type="button" variant="outline" onClick={onCancel}>
+          Cancelar
+        </Button>
+        <Button type="button" onClick={onConfirm} disabled={exceedsBalance}>
+          Guardar
+        </Button>
+      </div>
+    </div>
   )
 }

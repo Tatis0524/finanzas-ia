@@ -41,7 +41,11 @@ export function TransactionList({ limit, showHeader = true }: TransactionListPro
   }
 
   const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString("es-MX", {
+    // dateString viene como "YYYY-MM-DD" (sin hora). Si se le pasa directo a `new Date()`,
+    // JS lo interpreta como medianoche UTC y al mostrarlo en hora local puede retroceder un dia.
+    // Construimos la fecha con los componentes locales para evitar ese corrimiento.
+    const [year, month, day] = dateString.split("-").map(Number)
+    return new Date(year, month - 1, day).toLocaleDateString("es-MX", {
       day: "numeric",
       month: "short",
       year: "numeric",

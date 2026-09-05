@@ -11,6 +11,7 @@ async function fetchTransactions(): Promise<Transaction[]> {
     .from("transactions")
     .select("*, category:categories(*)")
     .order("date", { ascending: false })
+    .order("created_at", { ascending: false })
 
   if (error) throw error
   return data || []
