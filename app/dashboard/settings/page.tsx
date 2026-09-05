@@ -1,9 +1,12 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
+import { useTheme } from "next-themes"
+import { Switch } from "@/components/ui/switch"
+import { useAccentColor, type AccentColor } from "@/hooks/use-accent-color"
 import {
   Select,
   SelectContent,
@@ -34,13 +37,23 @@ const suggestedEmojis = [
 export default function SettingsPage() {
   const { profile, updateProfile, isLoading } = useProfile()
   const { user, signOut } = useAuth()
-  
+
   const [fullName, setFullName] = useState(profile?.full_name || "")
   const [currency, setCurrency] = useState(profile?.currency || "MXN")
   const [monthlyBudget, setMonthlyBudget] = useState(profile?.monthly_budget?.toString() || "")
   const [activeMonthLabel, setActiveMonthLabel] = useState(profile?.active_month_label || "")
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
+  const { theme, setTheme } = useTheme()
+  const [mounted, setMounted] = useState(false)
+  useEffect(() => setMounted(true), [])
+  const { accent, setAccent, mounted: accentMounted } = useAccentColor()
+
+  const accentColors: { value: AccentColor; label: string; swatch: string }[] = [
+    { value: "blue", label: "Azul", swatch: "oklch(0.45 0.18 250)" },
+    { value: "green", label: "Verde", swatch: "oklch(0.45 0.18 145)" },
+    { value: "purple", label: "Morado", swatch: "oklch(0.45 0.18 280)" },
+  ]
 
   const handleSave = async () => {
     setSaving(true)
@@ -156,8 +169,51 @@ export default function SettingsPage() {
                   Establece un limite de gastos mensuales para recibir alertas
                 </p>
               </Field>
+
+              {mounted && (
+                <Field>
+                  <div className="flex items-center justify-between">
+                    <FieldLabel htmlFor="dark-mode" className="cursor-pointer">
+                      Modo oscuro
+                    </FieldLabel>
+                    <Switch
+                      id="dark-mode"
+                      className="shrink-0"
+                      checked={theme === "dark"}
+                      onCheckedChange={(checked) => setTheme(checked ? "dark" : "light")}
+                    />
+                  </div>
+                </Field>
+              )}
+
+              {accentMounted && (
+                <Field>
+                  <FieldLabel>Color de acento</FieldLabel>
+                  <div className="flex gap-3 mt-1">
+                    {accentColors.map((c) => (
+                      <button
+                        key={c.value}
+                        type="button"
+                        onClick={() => setAccent(c.value)}
+                        aria-label={`Color ${c.label}`}
+                        title={c.label}
+                        className={`h-8 w-8 rounded-full border-2 transition-transform ${
+                          accent === c.value
+                            ? "border-foreground scale-110"
+                            : "border-transparent"
+                        }`}
+                        style={{ backgroundColor: c.swatch }}
+                      />
+                    ))}
+                  </div>
+                </Field>
+              )}
+
               <Field>
-                <FieldLabel htmlFor="activeMonthLabel">Nombre del mes activo</FieldLabel>
+                <FieldLabel htmlFor="activeMonthLabel">
+                  Nombre del mes activo
+                </FieldLabel>
+
                 <Input
                   id="activeMonthLabel"
                   value={activeMonthLabel}
@@ -165,12 +221,17 @@ export default function SettingsPage() {
                   placeholder="Ej: ✈️ Mes del viaje"
                   maxLength={40}
                 />
+
                 <div className="flex flex-wrap gap-1.5 mt-2">
                   {suggestedEmojis.map((emoji) => (
                     <button
                       key={emoji}
                       type="button"
-                      onClick={() => setActiveMonthLabel((prev) => `${emoji} ${prev.replace(/^\p{Emoji}\s*/u, "")}`.trim())}
+                      onClick={() =>
+                        setActiveMonthLabel((prev) =>
+                          `${emoji} ${prev.replace(/^\p{Emoji}\s*/u, "")}`.trim()
+                        )
+                      }
                       className="text-xl h-9 w-9 flex items-center justify-center rounded-md border border-border hover:bg-accent transition-colors"
                       title={`Usar ${emoji}`}
                     >
@@ -178,10 +239,13 @@ export default function SettingsPage() {
                     </button>
                   ))}
                 </div>
+
                 <p className="text-sm text-muted-foreground mt-1">
-                  Elige un emoji y escribe un nombre para identificar este mes, por ejemplo &quot;Mes del viaje&quot;
+                  Elige un emoji y escribe un nombre para identificar este mes,
+                  por ejemplo &quot;Mes del viaje&quot;
                 </p>
               </Field>
+
             </FieldGroup>
           </CardContent>
         </Card>
@@ -222,4 +286,4 @@ export default function SettingsPage() {
       </Card>
     </div>
   )
-}
+} 

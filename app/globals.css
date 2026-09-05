@@ -74,6 +74,32 @@
   --sidebar-ring: oklch(0.6 0.2 250);
 }
 
+:root[data-accent="green"] {
+  --primary: oklch(0.45 0.18 145);
+  --ring: oklch(0.45 0.18 145);
+  --sidebar-primary: oklch(0.45 0.18 145);
+  --sidebar-ring: oklch(0.45 0.18 145);
+}
+.dark[data-accent="green"] {
+  --primary: oklch(0.6 0.2 145);
+  --ring: oklch(0.6 0.2 145);
+  --sidebar-primary: oklch(0.6 0.2 145);
+  --sidebar-ring: oklch(0.6 0.2 145);
+}
+
+:root[data-accent="purple"] {
+  --primary: oklch(0.45 0.18 280);
+  --ring: oklch(0.45 0.18 280);
+  --sidebar-primary: oklch(0.45 0.18 280);
+  --sidebar-ring: oklch(0.45 0.18 280);
+}
+.dark[data-accent="purple"] {
+  --primary: oklch(0.6 0.2 280);
+  --ring: oklch(0.6 0.2 280);
+  --sidebar-primary: oklch(0.6 0.2 280);
+  --sidebar-ring: oklch(0.6 0.2 280);
+}
+
 @theme inline {
   --font-sans: 'Geist', 'Geist Fallback';
   --font-mono: 'Geist Mono', 'Geist Mono Fallback';
