@@ -84,7 +84,7 @@ export function TransactionList({ limit, showHeader = true }: TransactionListPro
     <>
       <Card className="border-border/50">
         {showHeader && (
-          <CardHeader className="flex flex-row items-center justify-between">
+          <CardHeader className="flex flex-row flex-wrap items-center justify-between gap-2">
             <CardTitle>Transacciones Recientes</CardTitle>
             <TransactionForm />
           </CardHeader>

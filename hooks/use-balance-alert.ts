@@ -66,7 +66,9 @@ export function useBalanceAlert(): BalanceAlertResult {
       level === "critico" && now - lastNotifiedAt.current > COOLDOWN_MS
 
     if (cruzoAcritico || siguecriticoYPasoElTiempo) {
-      dispararNotificacionCritica(percentage)
+      dispararNotificacionCritica(percentage).catch((err) => {
+        console.warn("[BalanceAlert] Notificación falló silenciosamente:", err)
+      })
       lastNotifiedAt.current = now
     }
     previousLevel.current = level
@@ -75,23 +77,47 @@ export function useBalanceAlert(): BalanceAlertResult {
   return { monthlyIncome, balance, percentage, level }
 }
 
-function dispararNotificacionCritica(percentage: number | null) {
+async function dispararNotificacionCritica(percentage: number | null) {
   if (typeof window === "undefined" || !("Notification" in window)) return
 
   const body = `Tu saldo disponible es el ${percentage?.toFixed(1)}% de tus ingresos del mes.`
 
-  const enviar = () => {
-    new Notification("⚠️ Saldo en nivel crítico", {
-      body,
-      icon: "/icons/icon-192.png",
-    })
+  const enviar = async () => {
+    try {
+      // En Chrome de escritorio el constructor Notification() funciona directo.
+      // En Chrome Android (y muchos otros navegadores moviles), ese constructor
+      // esta BLOQUEADO y lanza "Illegal constructor" - solo se permite mostrar
+      // notificaciones a traves de un Service Worker registrado.
+      if ("serviceWorker" in navigator) {
+        const registration = await navigator.serviceWorker.getRegistration()
+        if (registration) {
+          await registration.showNotification("⚠️ Saldo en nivel crítico", {
+            body,
+            icon: "/icons/icon-192.png",
+          })
+          return
+        }
+      }
+
+      // Fallback: navegadores de escritorio que si soportan el constructor directo
+      new Notification("⚠️ Saldo en nivel crítico", {
+        body,
+        icon: "/icons/icon-192.png",
+      })
+    } catch (err) {
+      // Nunca dejar que un fallo de notificaciones rompa el render de la app
+      console.warn("[BalanceAlert] No se pudo mostrar la notificación:", err)
+    }
   }
 
-  if (Notification.permission === "granted") {
-    enviar()
-  } else if (Notification.permission !== "denied") {
-    Notification.requestPermission().then((permission) => {
-      if (permission === "granted") enviar()
-    })
+  try {
+    if (Notification.permission === "granted") {
+      await enviar()
+    } else if (Notification.permission !== "denied") {
+      const permission = await Notification.requestPermission()
+      if (permission === "granted") await enviar()
+    }
+  } catch (err) {
+    console.warn("[BalanceAlert] Error al solicitar permiso de notificación:", err)
   }
 }
