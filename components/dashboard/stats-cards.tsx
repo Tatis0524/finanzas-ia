@@ -11,20 +11,11 @@ export function StatsCards() {
   const { profile } = useProfile()
 
   const stats = useMemo(() => {
-    const now = new Date()
-    const currentMonth = now.getMonth()
-    const currentYear = now.getFullYear()
-
-    const monthlyTransactions = transactions.filter((t) => {
-      const date = new Date(t.date)
-      return date.getMonth() === currentMonth && date.getFullYear() === currentYear
-    })
-
-    const totalIncome = monthlyTransactions
+    const totalIncome = transactions
       .filter((t) => t.type === "income")
       .reduce((sum, t) => sum + Number(t.amount), 0)
 
-    const totalExpenses = monthlyTransactions
+    const totalExpenses = transactions
       .filter((t) => t.type === "expense")
       .reduce((sum, t) => sum + Number(t.amount), 0)
 
