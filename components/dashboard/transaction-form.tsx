@@ -113,9 +113,10 @@ export function TransactionForm({ transaction, onSuccess, trigger }: Transaction
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
         {trigger || (
-          <Button className="gap-2">
+          <Button className="gap-2" size="sm">
             <Plus className="h-4 w-4" />
-            Nueva Transaccion
+            <span className="hidden sm:inline">Nueva Transaccion</span>
+            <span className="sm:hidden">Nueva</span>
           </Button>
         )}
       </DialogTrigger>

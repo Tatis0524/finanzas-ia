@@ -13,9 +13,13 @@ export default function VoicePage() {
         </p>
       </div>
 
-      <div className="grid gap-6 lg:grid-cols-2">
-        <VoiceInput />
-        <TransactionList limit={5} />
+      <div className="grid gap-6 lg:grid-cols-2 min-w-0">
+        <div className="min-w-0">
+          <VoiceInput />
+        </div>
+        <div className="min-w-0">
+          <TransactionList limit={5} />
+        </div>
       </div>
     </div>
   )

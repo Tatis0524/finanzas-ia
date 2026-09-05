@@ -427,7 +427,7 @@ export function VoiceInput() {
   }
 
   return (
-    <Card className="border-border/50">
+    <Card className="border-border/50 min-w-0">
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
           <Mic className="h-5 w-5" />

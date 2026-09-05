@@ -82,7 +82,7 @@ export function TransactionList({ limit, showHeader = true }: TransactionListPro
 
   return (
     <>
-      <Card className="border-border/50">
+      <Card className="border-border/50 min-w-0">
         {showHeader && (
           <CardHeader className="flex flex-row flex-wrap items-center justify-between gap-2">
             <CardTitle>Transacciones Recientes</CardTitle>
@@ -162,7 +162,7 @@ function TransactionItem({
         <p className="font-medium truncate">
           {transaction.description || category?.name || (isIncome ? "Ingreso" : "Gasto")}
         </p>
-        <p className="text-sm text-muted-foreground">
+        <p className="text-sm text-muted-foreground truncate">
           {category?.name && transaction.description ? `${category.name} • ` : ""}
           {formatDate(transaction.date)}
         </p>
