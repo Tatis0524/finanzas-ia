@@ -3,16 +3,32 @@
 import useSWR from "swr"
 import { createClient } from "@/lib/supabase/client"
 import type { Transaction, Category } from "@/lib/types"
+import { useMonthFilter } from "@/hooks/use-month-filter"
 
 const supabase = createClient()
 
-async function fetchTransactions(): Promise<Transaction[]> {
-  const { data, error } = await supabase
+function getMonthRange(monthKey: string) {
+  const [year, month] = monthKey.split("-").map(Number)
+  const start = `${year}-${String(month).padStart(2, "0")}-01`
+  const nextMonth = month === 12 ? 1 : month + 1
+  const nextYear = month === 12 ? year + 1 : year
+  const end = `${nextYear}-${String(nextMonth).padStart(2, "0")}-01`
+  return { start, end }
+}
+
+async function fetchTransactions(monthKey: string): Promise<Transaction[]> {
+  let query = supabase
     .from("transactions")
     .select("*, category:categories(*)")
     .order("date", { ascending: false })
     .order("created_at", { ascending: false })
 
+  if (monthKey !== "all") {
+    const { start, end } = getMonthRange(monthKey)
+    query = query.gte("date", start).lt("date", end)
+  }
+
+  const { data, error } = await query
   if (error) throw error
   return data || []
 }
@@ -28,9 +44,11 @@ async function fetchCategories(): Promise<Category[]> {
 }
 
 export function useTransactions() {
+  const { selectedMonth } = useMonthFilter()
+
   const { data, error, isLoading, mutate } = useSWR<Transaction[]>(
-    "transactions",
-    fetchTransactions
+    ["transactions", selectedMonth],
+    () => fetchTransactions(selectedMonth)
   )
 
   const addTransaction = async (transaction: Omit<Transaction, "id" | "user_id" | "created_at" | "updated_at" | "category">) => {
